@@ -214,17 +214,23 @@ void fetchAndDisplay() {
   // prepare urls (QWeather v7 endpoints)
   String weatherUrl = "https://" + String(apiHost) + "/v7/weather/now?location="  + String(lon) + "," + String(lat) + "&key=" + String(apiKey);
   String aqiUrl = "https://" + String(apiHost) + "/airquality/v1/current/" + String(lat) + "/" + String(lon) + "?key=" + String(apiKey);
+  String url3Day = "https://" + String(apiHost) + "/v7/weather/3d?location=" +  String(lon) + "," + String(lat) + "&key=" + apiKey;
+
   // TEMP files
   const char* gzWeather = "/weather.gz";
   const char* gzAQI     = "/aqi.gz";
+  const char* gz3Day = "/forecast.gz";
   const char* jsonWeather = "/weather.json";
   const char* jsonAQI     = "/aqi.json";
+  const char* js3Day = "/forecast.json";
 
   // remove old files
   if (LittleFS.exists(gzWeather)) LittleFS.remove(gzWeather);
   if (LittleFS.exists(gzAQI)) LittleFS.remove(gzAQI);
+  if (LittleFS.exists(gz3Day)) LittleFS.remove(gz3Day);
   if (LittleFS.exists(jsonWeather)) LittleFS.remove(jsonWeather);
   if (LittleFS.exists(jsonAQI)) LittleFS.remove(jsonAQI);
+  if (LittleFS.exists(js3Day)) LittleFS.remove(js3Day);
 
   u8g2.clearBuffer();
   u8g2.drawStr(0, 12, "Request Weather...");
@@ -235,6 +241,10 @@ void fetchAndDisplay() {
   u8g2.drawStr(0, 12, "Request AQI...");
   u8g2.sendBuffer();
   bool okA = fetchAndSaveGzipHTTPS(aqiUrl, gzAQI);
+  u8g2.clearBuffer();
+  u8g2.drawStr(0, 12, "Request 3 day forcast...");
+  u8g2.sendBuffer();
+  bool ok3day = fetchAndSaveGzipHTTPS(url3Day, gz3Day);
 
   if (!okW) {
     Serial.println("Failed to fetch weather gzip");
@@ -250,18 +260,27 @@ void fetchAndDisplay() {
     u8g2.sendBuffer();
     return;
   }
-
+  if (!ok3day) {
+    Serial.println("Failed to fetch 3 day forcast gzip");
+    u8g2.clearBuffer();
+    u8g2.drawStr(0,12,"3 day forcast fetch failed");
+    u8g2.sendBuffer();
+    return;
+  }
   // decompress gzip -> json
   u8g2.clearBuffer();
   u8g2.drawStr(0, 12, "Decompress Response...");
   u8g2.sendBuffer();
   String weatherJSON = decompressGzipToString(gzWeather, jsonWeather);
   String aqiJSON = decompressGzipToString(gzAQI, jsonAQI);
+  String f3dJSON  = decompressGzipToString(gz3Day, js3Day);
 
   Serial.println("=== Weather JSON ===");
   Serial.println(weatherJSON);
   Serial.println("=== AQI JSON ===");
   Serial.println(aqiJSON);
+  Serial.println("=== 3 DAY ===");
+  Serial.println(f3dJSON);
 
   // parse JSON
   float temp = 0.0;
@@ -269,6 +288,8 @@ void fetchAndDisplay() {
   String cond = "";
   int aqi = -1;
   String aqiCategory = "";
+  float tempMin = 0;
+  float tempMax = 0;
 
   if (weatherJSON.length() > 10) {
     StaticJsonDocument<1024> docW;
@@ -326,16 +347,24 @@ void fetchAndDisplay() {
   } else {
     Serial.println("AQI JSON empty");
   }
+  // FORECAST (3 days)
+  {
+    StaticJsonDocument<4096> doc;
+    if (deserializeJson(doc, f3dJSON) == DeserializationError::Ok) {
+      tempMin = doc["daily"][0]["tempMin"].as<float>();
+      tempMax = doc["daily"][0]["tempMax"].as<float>();
+    }
+  }
   // Debug prints
-  Serial.printf("Parsed: temp=%.1f humidity=%d cond='%s' aqi=%d aqiCategory='%s'\n",
-                temp, humidity, cond.c_str(), aqi, aqiCategory.c_str());
+  Serial.printf("Parsed: temp=%.1f ~ %.1f(%.1f) humidity=%d cond='%s' aqi=%d aqiCategory='%s'\n",
+                tempMin, tempMax, temp, humidity, cond.c_str(), aqi, aqiCategory.c_str());
   cond = convertCondition(cond);
   aqiCategory = convertAQICategory(aqiCategory);
 
   // display on OLED
   u8g2.clearBuffer();
   u8g2.drawStr(0, 10, "Shanghai Weather");
-  u8g2.drawStr(0, 22, (String("Temp: ") + String(temp, 1) + " C").c_str());
+  u8g2.drawStr(0, 22, (String("Temp: ") + String(tempMin, 0) + " - " + String(tempMax, 0) + " (" + String(temp, 0) + ")" + " C").c_str());
   u8g2.drawStr(0, 32, (String("Humidity: ") + String(humidity) + " %").c_str());
   if (aqi >= 0) {
     u8g2.drawStr(0, 44, (String("AQI: ") + String(aqi) + " " + aqiCategory).c_str());
@@ -345,4 +374,6 @@ void fetchAndDisplay() {
   u8g2.drawStr(0, 54, (String("Cond: ") + cond).c_str());
   u8g2.sendBuffer();
 
+  // cleanup (optional)
+  // LittleFS.remove(gzWeather); LittleFS.remove(gzAQI); // keep for debugging if needed
 }
