@@ -15,12 +15,12 @@
 U8G2_SSD1306_128X64_NONAME_F_SW_I2C u8g2(U8G2_R0, /* clock=*/7, /* data=*/6, /* reset=*/ U8X8_PIN_NONE);
 
 // WiFi credentials (you provided)
-const char* ssid     = "wifi_ssid";
-const char* password = "wifi_password";
+const char* ssid     = "your_wifi_ssid";
+const char* password = "your_wifi_password";
 
 // QWeather API Key (you provided)
-const char* apiKey = "your_api_key";
-const char* apiHost = "your_api_host";
+const char* apiKey = "your_qweather_api_key";
+const char* apiHost = "your_qweather_api_host";
 
 // Shanghai coords
 const float lat = 31.2304;
@@ -283,6 +283,7 @@ void setup() {
   u8g2.sendBuffer();
   delay(800);
 }
+
 void loop() {
   if (millis() - lastUpdate > updateInterval || lastUpdate == 0) {
     fetchAndDisplay();
@@ -290,8 +291,9 @@ void loop() {
   }
   delay(200);
 }
-int i = 0;
+
 /*
+int i = 0;
 void loop()
 {
   testDisplay(i);
@@ -305,7 +307,7 @@ void testDisplay(int index)
   String cond = conds[index];
   cond = convertCondition(cond);
   float temp = 20;
-  float tempMin = -6;
+  float tempMin = 6;
   float tempMax = 30;
   int humidity = 70;
   int aqi = 200;
@@ -314,6 +316,7 @@ void testDisplay(int index)
 
 void printToDisplay(String cond, float temp, float tempMin, float tempMax, int humidity, int aqi)
 {
+  const int SCREEN_WIDTH = 128;
   u8g2.clearBuffer();
   //
   // 第 1 行：城市名（上海）
@@ -324,17 +327,20 @@ void printToDisplay(String cond, float temp, float tempMin, float tempMax, int h
   //
   // 第 2 行：图标 + 当前温度
   //
-  u8g2.setFont(u8g2_font_10x20_tr); // big font
+  u8g2.setFont(u8g2_font_10x20_tf); // big font
+
   u8g2.drawStr(0, 26, cond.c_str());
-  String tempStr = String(temp, 0) + "C";
-  u8g2.drawStr(90, 26, tempStr.c_str());
+  String tempStr = String((int)temp) + "°C";
+  int w = u8g2.getUTF8Width(tempStr.c_str());  // UTF-8 字符串宽度（支持°）
+  int x = SCREEN_WIDTH - w - 5;   // 右对齐：屏幕宽度 - 文本宽度
+  u8g2.drawUTF8(x, 26, tempStr.c_str());
 
   //
   // 第 3 行：最低温 - 最高温°C
   //
-  u8g2.setFont(u8g2_font_8x13_tf);
-  String rangeStr = String(tempMin, 0) + " - " + String(tempMax, 0) + " C";
-  u8g2.drawStr(0, 42, rangeStr.c_str());
+  u8g2.setFont(u8g2_font_7x13_tf);
+  String rangeStr = String((int)tempMin) + " - " + String((int)tempMax) + "°C";
+  u8g2.drawUTF8(0, 42, rangeStr.c_str());
 
   //
   // 第 4 行：湿度 + AQI
@@ -344,7 +350,9 @@ void printToDisplay(String cond, float temp, float tempMin, float tempMax, int h
   u8g2.drawStr(0, 58, humStr.c_str());
 
   String aqiStr = "AQI:" + String(aqi);
-  u8g2.drawStr(70, 58, aqiStr.c_str());
+  w = u8g2.getUTF8Width(aqiStr.c_str());  // UTF-8 字符串宽度（支持°）
+  x = SCREEN_WIDTH - w - 5;   // 右对齐：屏幕宽度 - 文本宽度
+  u8g2.drawUTF8(x, 58, aqiStr.c_str());
 
   u8g2.sendBuffer();
 }
