@@ -10,17 +10,19 @@
 #include <ArduinoJson.h>
 #include <U8g2lib.h>
 #include <LittleFS.h>
+#include "icons.h"
 
 // OLED via SW I2C on SDA=6, SCL=7
-U8G2_SSD1306_128X64_NONAME_F_SW_I2C u8g2(U8G2_R0, /* clock=*/7, /* data=*/6, /* reset=*/ U8X8_PIN_NONE);
+U8G2_SSD1306_128X64_NONAME_F_SW_I2C u8g2(U8G2_R0, /* clock=*/7, /* data=*/6, /* reset=*/U8X8_PIN_NONE);
 
 // WiFi credentials (you provided)
-const char* ssid     = "your_wifi_ssid";
+const char* ssid = "your_wifi_ssid";
 const char* password = "your_wifi_password";
 
 // QWeather API Key (you provided)
 const char* apiKey = "your_qweather_api_key";
 const char* apiHost = "your_qweather_api_host";
+
 
 // Shanghai coords
 const float lat = 31.2304;
@@ -29,68 +31,10 @@ const float lon = 121.4737;
 // Update interval (10 minutes)
 const unsigned long updateInterval = 10UL * 60UL * 1000UL;
 unsigned long lastUpdate = 0;
-// --------------------- 16x16 icons (monochrome XBM-like arrays) ---------------------
-// Each icon is 16x16 = 32 bytes (LSB first per byte). These are simple pixel patterns.
-// You can replace them with better bitmaps if you like.
 
-static const unsigned char icon_sunny_bits[] U8X8_PROGMEM = {
-  0x00,0x00, 0x10,0x04, 0x10,0x04, 0x38,0x0E,
-  0x7C,0x3E, 0xFE,0x7F, 0xFE,0x7F, 0x7C,0x3E,
-  0x38,0x0E, 0x10,0x04, 0x10,0x04, 0x00,0x00,
-  0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00
-};
-
-static const unsigned char icon_partly_bits[] U8X8_PROGMEM = {
-  0x00,0x00, 0x1C,0x07, 0x36,0x0C, 0x63,0x18,
-  0xE3,0x38, 0xC3,0x30, 0xC3,0x30, 0x63,0x18,
-  0x36,0x0C, 0x1C,0x07, 0x00,0x00, 0x00,0x00,
-  0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00
-};
-
-static const unsigned char icon_cloudy_bits[] U8X8_PROGMEM = {
-  0x00,0x00, 0x00,0x00, 0x3C,0x0F, 0x7E,0x1F,
-  0xFF,0x3F, 0xFF,0x3F, 0x7E,0x1F, 0x1C,0x07,
-  0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00,
-  0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00
-};
-
-static const unsigned char icon_rain_bits[] U8X8_PROGMEM = {
-  0x00,0x00, 0x38,0x0E, 0x7C,0x3E, 0xFE,0x7F,
-  0xFF,0x3F, 0x7E,0x1F, 0x38,0x0E, 0x00,0x00,
-  0x10,0x04, 0x28,0x0A, 0x10,0x04, 0x28,0x0A,
-  0x10,0x04, 0x00,0x00, 0x00,0x00, 0x00,0x00
-};
-
-static const unsigned char icon_thunder_bits[] U8X8_PROGMEM = {
-  0x00,0x00, 0x10,0x04, 0x38,0x0E, 0x7C,0x3E,
-  0xFE,0x7F, 0x7C,0x3E, 0x38,0x0E, 0x10,0x04,
-  0x08,0x02, 0x18,0x06, 0x30,0x0C, 0x18,0x06,
-  0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00
-};
-
-static const unsigned char icon_snow_bits[] U8X8_PROGMEM = {
-  0x00,0x00, 0x24,0x09, 0x12,0x09, 0x7F,0x3E,
-  0x7F,0x3E, 0x12,0x09, 0x24,0x09, 0x00,0x00,
-  0x00,0x00, 0x24,0x09, 0x12,0x09, 0x00,0x00,
-  0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00
-};
-
-static const unsigned char icon_fog_bits[] U8X8_PROGMEM = {
-  0x00,0x00, 0x00,0x00, 0x7E,0x1F, 0x00,0x00,
-  0x7E,0x1F, 0x00,0x00, 0x7E,0x1F, 0x00,0x00,
-  0x00,0x00, 0x7E,0x1F, 0x00,0x00, 0x00,0x00,
-  0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00
-};
-
-static const unsigned char icon_haze_bits[] U8X8_PROGMEM = {
-  0x00,0x00, 0x3C,0x0F, 0x66,0x19, 0xC3,0x30,
-  0xFF,0x3F, 0xC3,0x30, 0x66,0x19, 0x3C,0x0F,
-  0x00,0x00, 0x00,0x00, 0x18,0x06, 0x18,0x06,
-  0x3C,0x0F, 0x00,0x00, 0x00,0x00, 0x00,0x00
-};
 
 // --------------------- helper mappings ---------------------
-String convertCondition(const String &cn) {
+String convertCondition(const String& cn) {
   if (cn == "晴") return "Sunny";
   if (cn == "多云") return "Cloudy";
   if (cn == "少云") return "Cloudy";
@@ -101,7 +45,7 @@ String convertCondition(const String &cn) {
   if (cn == "阵雨") return "Shower";
   if (cn == "雷阵雨") return "Thunder";
   if (cn == "雷暴") return "Thunder";
-  if (cn == "雪" ) return "Snow";
+  if (cn == "雪") return "Snow";
   if (cn == "小雪") return "Snow*";
   if (cn == "中雪") return "Snow**";
   if (cn == "大雪") return "Snow***";
@@ -111,7 +55,7 @@ String convertCondition(const String &cn) {
   return cn;
 }
 
-String convertAQICategory(const String &cn) {
+String convertAQICategory(const String& cn) {
   if (cn == "优") return "Good";
   if (cn == "良") return "Fair";
   if (cn == "轻度污染") return "Mild";
@@ -122,25 +66,28 @@ String convertAQICategory(const String &cn) {
 }
 
 // choose icon pointer based on original Chinese condition (cn)
-const unsigned char* chooseIcon(const String &cn) {
+const unsigned char* chooseIcon(const String& cn) {
   // check substrings to be robust
-  if (cn.indexOf("晴") >= 0) return icon_sunny_bits;
-  if (cn.indexOf("多云") >= 0) return icon_cloudy_bits;
-  if (cn.indexOf("少云") >= 0 || cn.indexOf("局部") >= 0) return icon_partly_bits;
-  if (cn.indexOf("雨") >= 0 && cn.indexOf("雷") < 0) return icon_rain_bits;
-  if (cn.indexOf("雷") >= 0) return icon_thunder_bits;
-  if (cn.indexOf("雪") >= 0) return icon_snow_bits;
-  if (cn.indexOf("雾") >= 0) return icon_fog_bits;
-  if (cn.indexOf("霾") >= 0 || cn.indexOf("沙") >= 0 || cn.indexOf("尘") >= 0) return icon_haze_bits;
-  return icon_cloudy_bits;
+  if (cn.indexOf("晴") >= 0) return icon_sunny_32_bits;
+  if (cn.indexOf("多云") >= 0) return icon_cloudy_32_bits;
+  if (cn.indexOf("少云") >= 0 || cn.indexOf("局部") >= 0) return icon_cloudy_32_bits;
+  if (cn.indexOf("小雨") >= 0 && cn.indexOf("雷") < 0) return icon_lightrain_32_bits;
+  if (cn.indexOf("中雨") >= 0 && cn.indexOf("雷") < 0) return icon_moderaterain_32_bits;
+  if (cn.indexOf("大雨") >= 0 && cn.indexOf("雷") < 0) return icon_heavyrain_32_bits;
+  if (cn.indexOf("雨") >= 0 && cn.indexOf("雷") < 0) return icon_moderaterain_32_bits;
+  if (cn.indexOf("雷") >= 0) return icon_thundershower_32_bits;
+  if (cn.indexOf("雪") >= 0) return icon_snow_32_bits;
+  if (cn.indexOf("雾") >= 0) return icon_fog_32_bits;
+  if (cn.indexOf("霾") >= 0 || cn.indexOf("沙") >= 0 || cn.indexOf("尘") >= 0) return icon_haze_32_bits;
+  return icon_cloudy_32_bits;
 }
 
 // helper: save HTTPS response stream to file (binary)
-bool fetchAndSaveGzipHTTPS(const String &url, const char *dstPath) {
+bool fetchAndSaveGzipHTTPS(const String& url, const char* dstPath) {
   Serial.printf("Fetching: %s\n", url.c_str());
 
   WiFiClientSecure client;
-  client.setInsecure(); // dev only; in production provide root certs
+  client.setInsecure();  // dev only; in production provide root certs
 
   HTTPClient https;
   if (!https.begin(client, url)) {
@@ -169,7 +116,7 @@ bool fetchAndSaveGzipHTTPS(const String &url, const char *dstPath) {
   }
 
   // read raw stream and write to file
-  WiFiClient *stream = https.getStreamPtr();
+  WiFiClient* stream = https.getStreamPtr();
   const size_t bufSize = 256;
   uint8_t buf[bufSize];
   unsigned long lastRead = millis();
@@ -215,7 +162,7 @@ String decompressGzipToString(const char* gzPath, const char* outJsonPath) {
   // remove old output if exists
   if (LittleFS.exists(outJsonPath)) LittleFS.remove(outJsonPath);
 
-  GzUnpacker *GZ = new GzUnpacker();
+  GzUnpacker* GZ = new GzUnpacker();
   GZ->haltOnError(true);
 
   Serial.printf("Ungzipping %s -> %s\n", gzPath, outJsonPath);
@@ -265,7 +212,7 @@ void setup() {
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
-    if (++waitCount > 120) { // timeout ~60s
+    if (++waitCount > 120) {  // timeout ~60s
       Serial.println("\nWiFi connect timeout");
       break;
     }
@@ -300,23 +247,66 @@ void loop()
   i = (i + 1) % 17;
   delay(2000);
 }
-*/
-void testDisplay(int index)
-{
-  String conds[] = {"晴", "多云", "少云", "阴", "小雨", "中雨", "大雨", "阵雨", "雷阵雨", "雷暴", "雪", "小雪", "中雪", "大雪", "雾", "霾", "扬沙"};
+
+void testDisplay(int index) {
+  String conds[] = { "晴", "多云", "少云", "阴", "小雨", "中雨", "大雨", "阵雨", "雷阵雨", "雷暴", "雪", "小雪", "中雪", "大雪", "雾", "霾", "扬沙" };
   String cond = conds[index];
-  cond = convertCondition(cond);
   float temp = 20;
   float tempMin = 6;
   float tempMax = 30;
   int humidity = 70;
   int aqi = 200;
-  printToDisplay(cond, temp, tempMin, tempMax, humidity, aqi);
+  printWithIcon(cond, temp, tempMin, tempMax, humidity, aqi);
 }
+*/
+const int SCREEN_WIDTH = 128;
 
-void printToDisplay(String cond, float temp, float tempMin, float tempMax, int humidity, int aqi)
-{
-  const int SCREEN_WIDTH = 128;
+void printWithIcon(String cond, float temp, float tempMin, float tempMax, int humidity, int aqi) {
+
+  u8g2.clearBuffer();
+  //
+  // 第 1 行：图标 + 当前温度
+  //
+  u8g2.setBitmapMode(1);
+  u8g2.drawXBMP(15, 0, 32, 32, chooseIcon(cond));
+  u8g2.setBitmapMode(0);
+
+  u8g2.setFont(u8g2_font_10x20_tf);  // big font
+  String tempStr = String((int)temp) + "°C";
+  int w = u8g2.getUTF8Width(tempStr.c_str());  // UTF-8 字符串宽度（支持°）
+  int x = SCREEN_WIDTH - w - 5;                // 右对齐：屏幕宽度 - 文本宽度
+  u8g2.drawUTF8(x, 23, tempStr.c_str());
+  //
+  // 第 4 行：天气   湿度 | AQI
+  //
+  cond = convertCondition(cond);
+  u8g2.setFont(u8g2_font_7x13_tf);
+  w = u8g2.getUTF8Width(cond.c_str());
+  x = (15 + 32 / 2) - w / 2; //对齐图标
+  u8g2.drawStr(x, 46, cond.c_str());
+
+
+  String humAqi = String(humidity) + "%|" + String(aqi);
+  w = u8g2.getUTF8Width(humAqi.c_str());  // UTF-8 字符串宽度（支持°）
+  x = SCREEN_WIDTH - w - 5;                // 右对齐：屏幕宽度 - 文本宽度
+  u8g2.drawUTF8(x, 46, humAqi.c_str());
+  //
+  // 分割线
+  //
+  u8g2.drawLine(10, 50, 118, 50);
+  //
+  // 第 3 行：最低温 - 最高温°C
+  //
+  u8g2.setFont(u8g2_font_7x13_tf);
+  String rangeStr = String((int)tempMin) + " - " + String((int)tempMax) + "°C";
+  w = u8g2.getUTF8Width(rangeStr.c_str()); 
+  x = SCREEN_WIDTH / 2 - w / 2; //居中
+  u8g2.drawUTF8(x, 63, rangeStr.c_str());
+
+  u8g2.sendBuffer();
+}
+void printToDisplay(String cond, float temp, float tempMin, float tempMax, int humidity, int aqi) {
+  cond = convertCondition(cond);
   u8g2.clearBuffer();
   //
   // 第 1 行：城市名（上海）
@@ -327,12 +317,12 @@ void printToDisplay(String cond, float temp, float tempMin, float tempMax, int h
   //
   // 第 2 行：图标 + 当前温度
   //
-  u8g2.setFont(u8g2_font_10x20_tf); // big font
+  u8g2.setFont(u8g2_font_10x20_tf);  // big font
 
   u8g2.drawStr(0, 26, cond.c_str());
   String tempStr = String((int)temp) + "°C";
   int w = u8g2.getUTF8Width(tempStr.c_str());  // UTF-8 字符串宽度（支持°）
-  int x = SCREEN_WIDTH - w - 5;   // 右对齐：屏幕宽度 - 文本宽度
+  int x = SCREEN_WIDTH - w - 5;                // 右对齐：屏幕宽度 - 文本宽度
   u8g2.drawUTF8(x, 26, tempStr.c_str());
 
   //
@@ -351,7 +341,7 @@ void printToDisplay(String cond, float temp, float tempMin, float tempMax, int h
 
   String aqiStr = "AQI:" + String(aqi);
   w = u8g2.getUTF8Width(aqiStr.c_str());  // UTF-8 字符串宽度（支持°）
-  x = SCREEN_WIDTH - w - 5;   // 右对齐：屏幕宽度 - 文本宽度
+  x = SCREEN_WIDTH - w - 5;               // 右对齐：屏幕宽度 - 文本宽度
   u8g2.drawUTF8(x, 58, aqiStr.c_str());
 
   u8g2.sendBuffer();
@@ -363,16 +353,16 @@ void fetchAndDisplay() {
   }
 
   // prepare urls (QWeather v7 endpoints)
-  String weatherUrl = "https://" + String(apiHost) + "/v7/weather/now?location="  + String(lon) + "," + String(lat) + "&key=" + String(apiKey);
+  String weatherUrl = "https://" + String(apiHost) + "/v7/weather/now?location=" + String(lon) + "," + String(lat) + "&key=" + String(apiKey);
   String aqiUrl = "https://" + String(apiHost) + "/airquality/v1/current/" + String(lat) + "/" + String(lon) + "?key=" + String(apiKey);
-  String url3Day = "https://" + String(apiHost) + "/v7/weather/3d?location=" +  String(lon) + "," + String(lat) + "&key=" + apiKey;
+  String url3Day = "https://" + String(apiHost) + "/v7/weather/3d?location=" + String(lon) + "," + String(lat) + "&key=" + apiKey;
 
   // TEMP files
   const char* gzWeather = "/weather.gz";
-  const char* gzAQI     = "/aqi.gz";
+  const char* gzAQI = "/aqi.gz";
   const char* gz3Day = "/forecast.gz";
   const char* jsonWeather = "/weather.json";
-  const char* jsonAQI     = "/aqi.json";
+  const char* jsonAQI = "/aqi.json";
   const char* js3Day = "/forecast.json";
 
   // remove old files
@@ -400,21 +390,21 @@ void fetchAndDisplay() {
   if (!okW) {
     Serial.println("Failed to fetch weather gzip");
     u8g2.clearBuffer();
-    u8g2.drawStr(0,12,"Weather fetch failed");
+    u8g2.drawStr(0, 12, "Weather fetch failed");
     u8g2.sendBuffer();
     return;
   }
   if (!okA) {
     Serial.println("Failed to fetch aqi gzip");
     u8g2.clearBuffer();
-    u8g2.drawStr(0,12,"AQI fetch failed");
+    u8g2.drawStr(0, 12, "AQI fetch failed");
     u8g2.sendBuffer();
     return;
   }
   if (!ok3day) {
     Serial.println("Failed to fetch 3 day forcast gzip");
     u8g2.clearBuffer();
-    u8g2.drawStr(0,12,"3 day forcast fetch failed");
+    u8g2.drawStr(0, 12, "3 day forcast fetch failed");
     u8g2.sendBuffer();
     return;
   }
@@ -424,7 +414,7 @@ void fetchAndDisplay() {
   u8g2.sendBuffer();
   String weatherJSON = decompressGzipToString(gzWeather, jsonWeather);
   String aqiJSON = decompressGzipToString(gzAQI, jsonAQI);
-  String f3dJSON  = decompressGzipToString(gz3Day, js3Day);
+  String f3dJSON = decompressGzipToString(gz3Day, js3Day);
 
   Serial.println("=== Weather JSON ===");
   Serial.println(weatherJSON);
@@ -460,7 +450,7 @@ void fetchAndDisplay() {
 
   if (aqiJSON.length() > 10) {
     // AQI JSON can be large — use dynamic allocation
-    const size_t cap = 16 * 1024; // 16 KB
+    const size_t cap = 16 * 1024;  // 16 KB
     DynamicJsonDocument docA(cap);
     auto err = deserializeJson(docA, aqiJSON);
     if (!err) {
@@ -486,7 +476,7 @@ void fetchAndDisplay() {
         } else if (idx0.containsKey("name")) {
           aqiCategory = String((const char*)idx0["name"].as<const char*>());
         }
-      } else if (docA.containsKey("data") && docA["data"].containsKey("aqi")) { // some variants
+      } else if (docA.containsKey("data") && docA["data"].containsKey("aqi")) {  // some variants
         aqi = docA["data"]["aqi"].as<int>();
       } else {
         Serial.println("AQI JSON: unknown structure");
@@ -509,23 +499,8 @@ void fetchAndDisplay() {
   // Debug prints
   Serial.printf("Parsed: temp=%.1f ~ %.1f(%.1f) humidity=%d cond='%s' aqi=%d aqiCategory='%s'\n",
                 tempMin, tempMax, temp, humidity, cond.c_str(), aqi, aqiCategory.c_str());
-  cond = convertCondition(cond);
-  aqiCategory = convertAQICategory(aqiCategory);
-/*
-  // display on OLED
-  u8g2.clearBuffer();
-  u8g2.drawStr(0, 10, "Shanghai Weather");
-  u8g2.drawStr(0, 22, (String("Temp: ") + String(tempMin, 0) + " - " + String(tempMax, 0) + " (" + String(temp, 0) + ")" + " C").c_str());
-  u8g2.drawStr(0, 32, (String("Humidity: ") + String(humidity) + " %").c_str());
-  if (aqi >= 0) {
-    u8g2.drawStr(0, 44, (String("AQI: ") + String(aqi) + " " + aqiCategory).c_str());
-  } else {
-    u8g2.drawStr(0, 44, "AQI: N/A");
-  }
-  u8g2.drawStr(0, 54, (String("Cond: ") + cond).c_str());
-  u8g2.sendBuffer();
-*/
-  printToDisplay(cond, temp, tempMin, tempMax, humidity, aqi);
+
+  printWithIcon(cond, temp, tempMin, tempMax, humidity, aqi);
   // cleanup (optional)
   // LittleFS.remove(gzWeather); LittleFS.remove(gzAQI); // keep for debugging if needed
 }
