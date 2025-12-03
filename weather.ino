@@ -29,6 +29,111 @@ const float lon = 121.4737;
 // Update interval (10 minutes)
 const unsigned long updateInterval = 10UL * 60UL * 1000UL;
 unsigned long lastUpdate = 0;
+// --------------------- 16x16 icons (monochrome XBM-like arrays) ---------------------
+// Each icon is 16x16 = 32 bytes (LSB first per byte). These are simple pixel patterns.
+// You can replace them with better bitmaps if you like.
+
+static const unsigned char icon_sunny_bits[] U8X8_PROGMEM = {
+  0x00,0x00, 0x10,0x04, 0x10,0x04, 0x38,0x0E,
+  0x7C,0x3E, 0xFE,0x7F, 0xFE,0x7F, 0x7C,0x3E,
+  0x38,0x0E, 0x10,0x04, 0x10,0x04, 0x00,0x00,
+  0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00
+};
+
+static const unsigned char icon_partly_bits[] U8X8_PROGMEM = {
+  0x00,0x00, 0x1C,0x07, 0x36,0x0C, 0x63,0x18,
+  0xE3,0x38, 0xC3,0x30, 0xC3,0x30, 0x63,0x18,
+  0x36,0x0C, 0x1C,0x07, 0x00,0x00, 0x00,0x00,
+  0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00
+};
+
+static const unsigned char icon_cloudy_bits[] U8X8_PROGMEM = {
+  0x00,0x00, 0x00,0x00, 0x3C,0x0F, 0x7E,0x1F,
+  0xFF,0x3F, 0xFF,0x3F, 0x7E,0x1F, 0x1C,0x07,
+  0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00,
+  0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00
+};
+
+static const unsigned char icon_rain_bits[] U8X8_PROGMEM = {
+  0x00,0x00, 0x38,0x0E, 0x7C,0x3E, 0xFE,0x7F,
+  0xFF,0x3F, 0x7E,0x1F, 0x38,0x0E, 0x00,0x00,
+  0x10,0x04, 0x28,0x0A, 0x10,0x04, 0x28,0x0A,
+  0x10,0x04, 0x00,0x00, 0x00,0x00, 0x00,0x00
+};
+
+static const unsigned char icon_thunder_bits[] U8X8_PROGMEM = {
+  0x00,0x00, 0x10,0x04, 0x38,0x0E, 0x7C,0x3E,
+  0xFE,0x7F, 0x7C,0x3E, 0x38,0x0E, 0x10,0x04,
+  0x08,0x02, 0x18,0x06, 0x30,0x0C, 0x18,0x06,
+  0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00
+};
+
+static const unsigned char icon_snow_bits[] U8X8_PROGMEM = {
+  0x00,0x00, 0x24,0x09, 0x12,0x09, 0x7F,0x3E,
+  0x7F,0x3E, 0x12,0x09, 0x24,0x09, 0x00,0x00,
+  0x00,0x00, 0x24,0x09, 0x12,0x09, 0x00,0x00,
+  0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00
+};
+
+static const unsigned char icon_fog_bits[] U8X8_PROGMEM = {
+  0x00,0x00, 0x00,0x00, 0x7E,0x1F, 0x00,0x00,
+  0x7E,0x1F, 0x00,0x00, 0x7E,0x1F, 0x00,0x00,
+  0x00,0x00, 0x7E,0x1F, 0x00,0x00, 0x00,0x00,
+  0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00
+};
+
+static const unsigned char icon_haze_bits[] U8X8_PROGMEM = {
+  0x00,0x00, 0x3C,0x0F, 0x66,0x19, 0xC3,0x30,
+  0xFF,0x3F, 0xC3,0x30, 0x66,0x19, 0x3C,0x0F,
+  0x00,0x00, 0x00,0x00, 0x18,0x06, 0x18,0x06,
+  0x3C,0x0F, 0x00,0x00, 0x00,0x00, 0x00,0x00
+};
+
+// --------------------- helper mappings ---------------------
+String convertCondition(const String &cn) {
+  if (cn == "晴") return "Sunny";
+  if (cn == "多云") return "Cloudy";
+  if (cn == "少云") return "Cloudy";
+  if (cn == "阴") return "Cloudy";
+  if (cn == "小雨") return "Rain!";
+  if (cn == "中雨") return "Rain!!";
+  if (cn == "大雨") return "Rain!!!";
+  if (cn == "阵雨") return "Shower";
+  if (cn == "雷阵雨") return "Thunder";
+  if (cn == "雷暴") return "Thunder";
+  if (cn == "雪" ) return "Snow";
+  if (cn == "小雪") return "Snow*";
+  if (cn == "中雪") return "Snow**";
+  if (cn == "大雪") return "Snow***";
+  if (cn == "雾" || cn == "轻雾") return "Fog";
+  if (cn == "霾") return "Haze";
+  if (cn == "扬沙" || cn == "浮尘" || cn == "沙尘暴") return "Dust";
+  return cn;
+}
+
+String convertAQICategory(const String &cn) {
+  if (cn == "优") return "Good";
+  if (cn == "良") return "Fair";
+  if (cn == "轻度污染") return "Mild";
+  if (cn == "中度污染") return "Moderate";
+  if (cn == "重度污染") return "Heavy";
+  if (cn == "严重污染") return "Severe";
+  return cn;
+}
+
+// choose icon pointer based on original Chinese condition (cn)
+const unsigned char* chooseIcon(const String &cn) {
+  // check substrings to be robust
+  if (cn.indexOf("晴") >= 0) return icon_sunny_bits;
+  if (cn.indexOf("多云") >= 0) return icon_cloudy_bits;
+  if (cn.indexOf("少云") >= 0 || cn.indexOf("局部") >= 0) return icon_partly_bits;
+  if (cn.indexOf("雨") >= 0 && cn.indexOf("雷") < 0) return icon_rain_bits;
+  if (cn.indexOf("雷") >= 0) return icon_thunder_bits;
+  if (cn.indexOf("雪") >= 0) return icon_snow_bits;
+  if (cn.indexOf("雾") >= 0) return icon_fog_bits;
+  if (cn.indexOf("霾") >= 0 || cn.indexOf("沙") >= 0 || cn.indexOf("尘") >= 0) return icon_haze_bits;
+  return icon_cloudy_bits;
+}
 
 // helper: save HTTPS response stream to file (binary)
 bool fetchAndSaveGzipHTTPS(const String &url, const char *dstPath) {
@@ -178,7 +283,6 @@ void setup() {
   u8g2.sendBuffer();
   delay(800);
 }
-
 void loop() {
   if (millis() - lastUpdate > updateInterval || lastUpdate == 0) {
     fetchAndDisplay();
@@ -186,25 +290,64 @@ void loop() {
   }
   delay(200);
 }
-
-String convertCondition(const String &cn) {
-  if (cn == "晴") return "Sunny";
-  if (cn == "多云") return "Cloudy";
-  if (cn == "小雨") return "LightRain";
-  if (cn == "霾") return "Haze";
-  if (cn == "阴") return "Overcast";
-  return cn;
+int i = 0;
+/*
+void loop()
+{
+  testDisplay(i);
+  i = (i + 1) % 17;
+  delay(2000);
+}
+*/
+void testDisplay(int index)
+{
+  String conds[] = {"晴", "多云", "少云", "阴", "小雨", "中雨", "大雨", "阵雨", "雷阵雨", "雷暴", "雪", "小雪", "中雪", "大雪", "雾", "霾", "扬沙"};
+  String cond = conds[index];
+  cond = convertCondition(cond);
+  float temp = 20;
+  float tempMin = -6;
+  float tempMax = 30;
+  int humidity = 70;
+  int aqi = 200;
+  printToDisplay(cond, temp, tempMin, tempMax, humidity, aqi);
 }
 
-String convertAQICategory(const String &cn) {
-  if (cn == "优") return "Good";
-  if (cn == "良") return "Fair";
-  if (cn == "轻度污染") return "MildPoll";
-  if (cn == "中度污染") return "ModPoll";
-  if (cn == "重度污染") return "HeavyPoll";
-  return cn;
-}
+void printToDisplay(String cond, float temp, float tempMin, float tempMax, int humidity, int aqi)
+{
+  u8g2.clearBuffer();
+  //
+  // 第 1 行：城市名（上海）
+  //
+  u8g2.setFont(u8g2_font_6x10_tr);
+  u8g2.drawStr(0, 10, "Shanghai");
 
+  //
+  // 第 2 行：图标 + 当前温度
+  //
+  u8g2.setFont(u8g2_font_10x20_tr); // big font
+  u8g2.drawStr(0, 26, cond.c_str());
+  String tempStr = String(temp, 0) + "C";
+  u8g2.drawStr(90, 26, tempStr.c_str());
+
+  //
+  // 第 3 行：最低温 - 最高温°C
+  //
+  u8g2.setFont(u8g2_font_8x13_tf);
+  String rangeStr = String(tempMin, 0) + " - " + String(tempMax, 0) + " C";
+  u8g2.drawStr(0, 42, rangeStr.c_str());
+
+  //
+  // 第 4 行：湿度 + AQI
+  //
+  u8g2.setFont(u8g2_font_7x13_tf);
+  String humStr = "Hum:" + String(humidity) + "%";
+  u8g2.drawStr(0, 58, humStr.c_str());
+
+  String aqiStr = "AQI:" + String(aqi);
+  u8g2.drawStr(70, 58, aqiStr.c_str());
+
+  u8g2.sendBuffer();
+}
 void fetchAndDisplay() {
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("No WiFi");
@@ -360,7 +503,7 @@ void fetchAndDisplay() {
                 tempMin, tempMax, temp, humidity, cond.c_str(), aqi, aqiCategory.c_str());
   cond = convertCondition(cond);
   aqiCategory = convertAQICategory(aqiCategory);
-
+/*
   // display on OLED
   u8g2.clearBuffer();
   u8g2.drawStr(0, 10, "Shanghai Weather");
@@ -373,7 +516,8 @@ void fetchAndDisplay() {
   }
   u8g2.drawStr(0, 54, (String("Cond: ") + cond).c_str());
   u8g2.sendBuffer();
-
+*/
+  printToDisplay(cond, temp, tempMin, tempMax, humidity, aqi);
   // cleanup (optional)
   // LittleFS.remove(gzWeather); LittleFS.remove(gzAQI); // keep for debugging if needed
 }
